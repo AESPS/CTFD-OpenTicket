@@ -1,5 +1,6 @@
-# CTFD-OpenTicket
-“CTFd plugin: Chat with admins, get answers fast ⚡”
+# CTFd – Slide Into Admins’ DMs
+💬 A plugin that lets players message admins directly from challenge pages.
+
 Slide into the admin DMs (but make it professional 👀).
 This plugin adds an in-challenge chat box where players can drop questions, ask for hints, or cry for help 🆘. Admins can reply in real-time, so no more lost tickets or slow email chains.
 
