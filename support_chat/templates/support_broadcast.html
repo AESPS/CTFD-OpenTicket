@@ -1,0 +1,276 @@
+<!-- support_broadcast.html -->
+{# Admin: Broadcast Messages - Improved Version #}
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0">Broadcast Message</h3>
+    <a href="/support/admin" class="btn btn-secondary">
+      <i class="fas fa-arrow-left mr-1"></i>Back to Tickets
+    </a>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-bullhorn mr-2"></i>Send Broadcast Message</h5>
+        </div>
+        <div class="card-body">
+          <form id="broadcast-form">
+            <div class="form-group">
+              <label for="broadcast-message">Message</label>
+              <textarea id="broadcast-message" name="message" class="form-control" rows="4" 
+                        placeholder="Enter your broadcast message here..." required></textarea>
+            </div>
+            
+            <div class="form-group">
+              <label for="broadcast-target">Send to:</label>
+              <select id="broadcast-target" name="target" class="form-control">
+                <option value="all">All Users (Recommended)</option>
+                <option value="open_tickets">Users with Open Tickets Only</option>
+              </select>
+            </div>
+            
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle mr-2"></i>
+              <strong>How it works:</strong>
+              <ul class="mb-0 mt-2">
+                <li><strong>All Users:</strong> Creates support tickets for users who don't have them, then sends the broadcast message</li>
+                <li><strong>Open Tickets Only:</strong> Sends only to users who already have active support conversations</li>
+                <li>All broadcast messages are prefixed with <code>[BROADCAST]</code> to distinguish them</li>
+                <li>Large user bases are processed in batches to ensure reliability</li>
+              </ul>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg">
+              <i class="fas fa-paper-plane mr-2"></i>Send Broadcast
+            </button>
+          </form>
+          
+          <div id="broadcast-result" class="mt-3" style="display: none;"></div>
+          <div id="broadcast-progress" class="mt-3" style="display: none;">
+            <div class="progress">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                   role="progressbar" style="width: 0%">
+                <span class="progress-text">Preparing...</span>
+              </div>
+            </div>
+            <small class="text-muted mt-2 d-block" id="progress-details">Starting broadcast...</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">Broadcast Statistics</h6>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="d-flex justify-content-between">
+              <strong>Total Users:</strong>
+              <span id="total-users">Loading...</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <div class="d-flex justify-content-between">
+              <strong>Open Tickets:</strong>
+              <span id="open-tickets">Loading...</span>
+            </div>
+          </div>
+          <hr>
+          <h6>Broadcast Options</h6>
+          <div class="mb-3">
+            <strong>All Users</strong>
+            <p class="small text-muted">Sends message to every registered user. Creates new support tickets as needed.</p>
+          </div>
+          <div class="mb-3">
+            <strong>Open Tickets Only</strong>
+            <p class="small text-muted">Sends only to users who already have active support conversations.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('broadcast-form');
+  const resultDiv = document.getElementById('broadcast-result');
+  const progressDiv = document.getElementById('broadcast-progress');
+  const progressBar = progressDiv.querySelector('.progress-bar');
+  const progressText = progressDiv.querySelector('.progress-text');
+  const progressDetails = document.getElementById('progress-details');
+
+  // Load statistics on page load
+  loadStatistics();
+
+  async function loadStatistics() {
+    try {
+      // You might want to add an endpoint for this, for now we'll show placeholders
+      document.getElementById('total-users').textContent = '...';
+      document.getElementById('open-tickets').textContent = '...';
+    } catch (error) {
+      console.error('Failed to load statistics:', error);
+    }
+  }
+
+  // Handle form submission
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const target = document.getElementById('broadcast-target').value;
+    
+    // Show confirmation for all users broadcast
+    if (target === 'all') {
+      const confirmed = confirm(
+        'Are you sure you want to send a broadcast to ALL users?\n\n' +
+        'This will:\n' +
+        '• Send the message to every registered user\n' +
+        '• Create new support tickets for users who don\'t have them\n' +
+        '• May take some time for large user bases\n\n' +
+        'Continue?'
+      );
+      
+      if (!confirmed) return;
+    }
+    
+    submitBtn.disabled = true;
+    resultDiv.style.display = 'none';
+    progressDiv.style.display = 'block';
+    
+    // Start progress animation
+    updateProgress(0, 'Preparing broadcast...');
+    
+    try {
+      // Get CSRF nonce
+      const nonceResponse = await fetch('/support/nonce', { credentials: 'same-origin' });
+      const nonceData = await nonceResponse.json();
+      const nonce = nonceData.nonce || '';
+      
+      // Simulate progress updates
+      updateProgress(10, 'Validating message...');
+      
+      // Prepare form data
+      const formData = new FormData(form);
+      formData.append('nonce', nonce);
+      
+      updateProgress(25, 'Sending broadcast...');
+      
+      const response = await fetch('/support/admin/broadcast', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+      });
+      
+      updateProgress(75, 'Processing results...');
+      
+      const result = await response.json();
+      
+      updateProgress(100, 'Complete!');
+      
+      // Hide progress and show results
+      setTimeout(() => {
+        progressDiv.style.display = 'none';
+        
+        if (result.ok) {
+          resultDiv.className = 'alert alert-success mt-3';
+          let message = `<i class="fas fa-check mr-2"></i>${result.message}`;
+          
+          // Show any errors if present
+          if (result.errors && result.errors.length > 0) {
+            message += `<div class="mt-2"><strong>Some errors occurred:</strong><ul class="mb-0 mt-1">`;
+            result.errors.forEach(error => {
+              message += `<li class="small">${error}</li>`;
+            });
+            message += `</ul></div>`;
+          }
+          
+          resultDiv.innerHTML = message;
+          form.reset();
+        } else {
+          resultDiv.className = 'alert alert-danger mt-3';
+          resultDiv.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Error: ${result.error}`;
+        }
+        
+        resultDiv.style.display = 'block';
+      }, 500);
+      
+    } catch (error) {
+      console.error('Broadcast error:', error);
+      progressDiv.style.display = 'none';
+      resultDiv.className = 'alert alert-danger mt-3';
+      resultDiv.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i>Failed to send broadcast: ${error.message}`;
+      resultDiv.style.display = 'block';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Send Broadcast';
+    }
+  });
+
+  function updateProgress(percentage, message) {
+    progressBar.style.width = percentage + '%';
+    progressText.textContent = percentage === 100 ? 'Complete!' : `${percentage}%`;
+    progressDetails.textContent = message;
+  }
+
+  // Update target selection help text
+  document.getElementById('broadcast-target').addEventListener('change', function() {
+    const alertBox = document.querySelector('.alert-info');
+    const target = this.value;
+    
+    if (target === 'all') {
+      alertBox.className = 'alert alert-info';
+    } else {
+      alertBox.className = 'alert alert-warning';
+    }
+  });
+});
+</script>
+
+<style>
+.progress-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-weight: bold;
+  color: white;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+}
+
+.progress {
+  position: relative;
+  height: 30px;
+}
+
+#progress-details {
+  font-style: italic;
+}
+
+.alert ul {
+  padding-left: 1.2rem;
+}
+
+.alert code {
+  background-color: rgba(255,255,255,0.3);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+}
+
+/* Confirmation dialog styling */
+.btn-primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: all 0.2s ease;
+}
+</style>
+{% endblock %}
